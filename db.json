@@ -1,0 +1,329 @@
+{
+  "settings": {
+    "botName": "ACAKAFE RESERVASI",
+    "description": "Sistem Reservasi Meja Restoran & Cafe Modern",
+    "shopName": "ACAKAFE",
+    "shopAddress": "Jalan Kenangan Bersama Mantan Tersayang",
+    "logo": "https://files.catbox.moe/gzvy8t.jpg"
+  },
+  "areas": [
+    {
+      "id": "Indoor",
+      "name": "Indoor",
+      "capacity": 20
+    },
+    {
+      "id": "Outdoor",
+      "name": "Outdoor",
+      "capacity": 15
+    },
+    {
+      "id": "VIP",
+      "name": "VIP Room",
+      "capacity": 10
+    }
+  ],
+  "tables": [
+    {
+      "id": "T-01",
+      "name": "Meja 1 (Indoor)",
+      "area": "Indoor",
+      "capacity": 4
+    },
+    {
+      "id": "T-02",
+      "name": "Meja 2 (Indoor)",
+      "area": "Indoor",
+      "capacity": 4
+    },
+    {
+      "id": "T-03",
+      "name": "Meja 3 (Indoor Large)",
+      "area": "Indoor",
+      "capacity": 6
+    },
+    {
+      "id": "T-04",
+      "name": "Meja 4 (Outdoor Garden)",
+      "area": "Outdoor",
+      "capacity": 4
+    },
+    {
+      "id": "T-05",
+      "name": "Meja 5 (Outdoor Garden)",
+      "area": "Outdoor",
+      "capacity": 4
+    },
+    {
+      "id": "V-01",
+      "name": "Meja VIP Room 1",
+      "area": "VIP",
+      "capacity": 10
+    }
+  ],
+  "users": {
+    "111222333": {
+      "id": 111222333,
+      "username": "budi_s",
+      "firstName": "Budi",
+      "firstSeen": "2026-08-20T09:58:10.000Z",
+      "lastSeen": "2026-08-20T10:07:44.000Z",
+      "totalReservations": 1
+    },
+    "1669925773": {
+      "id": 1669925773,
+      "username": "sofunsyabi",
+      "firstName": "Rfi",
+      "firstSeen": "2026-08-20T07:32:14.129Z",
+      "lastSeen": "2026-08-20T09:02:56.754Z",
+      "totalReservations": 2
+    }
+  },
+  "reservations": [
+    {
+      "id": "RSV-5358",
+      "userId": 1669925773,
+      "username": "sofunsyabi",
+      "name": "ANDRE RUMI",
+      "phone": "085183221210",
+      "date": "31-08-2026",
+      "time": "20:00",
+      "durationHours": 2,
+      "area": "Indoor",
+      "tableId": "T-01",
+      "tableName": "Meja 1 (Indoor)",
+      "people": "5",
+      "note": "Ulang tahun",
+      "status": "Dikonfirmasi",
+      "isRecurring": false,
+      "recurringPattern": null,
+      "reminderSentH1": false,
+      "completionNotified": false,
+      "createdAt": "2026-08-20T07:32:53.069Z",
+      "updatedAt": "2026-08-20T07:33:51.593Z"
+    },
+    {
+      "id": "RSV-6197",
+      "userId": 1669925773,
+      "username": "sofunsyabi",
+      "name": "ARASYA RAFI",
+      "phone": "0882132892684",
+      "date": "31-08-2026",
+      "time": "11:00",
+      "durationHours": 2,
+      "area": "Outdoor",
+      "tableId": "T-05",
+      "tableName": "Meja 5 (Outdoor Garden)",
+      "people": "8",
+      "note": "",
+      "status": "Dikonfirmasi",
+      "isRecurring": false,
+      "recurringPattern": null,
+      "reminderSentH1": false,
+      "completionNotified": false,
+      "createdAt": "2026-08-20T08:02:04.921Z",
+      "updatedAt": "2026-08-20T08:23:37.187Z",
+      "preorder": "Beef Steak Ribeye (4x), Iced Avocado Coffee (4x), Es Teh Manis Jumbo (1x)"
+    }
+  ],
+  "activities": [
+    {
+      "id": 1,
+      "type": "RESERVASI_BARU",
+      "reservationId": "RSV-4821",
+      "userId": 111222333,
+      "actor": "budi_s",
+      "description": "Reservasi baru RSV-4821 dibuat oleh Budi Santoso untuk Selasa, 25 Agustus 2026, 19:00.",
+      "timestamp": "2026-08-20T10:05:02.000Z"
+    },
+    {
+      "id": 2,
+      "type": "UBAH_STATUS",
+      "reservationId": "RSV-4821",
+      "userId": 111222333,
+      "actor": "sofunsyabi",
+      "description": "Status reservasi RSV-4821 diubah oleh Owner dari \"Pending\" menjadi \"Dikonfirmasi\".",
+      "timestamp": "2026-08-20T10:07:44.000Z"
+    },
+    {
+      "id": 3,
+      "type": "RESERVASI_BARU",
+      "reservationId": "RSV-5358",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Reservasi baru RSV-5358 dibuat oleh ANDRE RUMI untuk Sabtu, 22 Agustus 2026, 13:00.",
+      "timestamp": "2026-08-20T07:32:53.070Z"
+    },
+    {
+      "id": 4,
+      "type": "UBAH_STATUS",
+      "reservationId": "RSV-5358",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Status reservasi RSV-5358 diubah oleh Owner dari \"Pending\" menjadi \"Dikonfirmasi\".",
+      "timestamp": "2026-08-20T07:32:58.785Z"
+    },
+    {
+      "id": 5,
+      "type": "UBAH_JADWAL",
+      "reservationId": "RSV-5358",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Jadwal reservasi RSV-5358 diubah dari \"Sabtu, 22 Agustus 2026, 13:00\" menjadi \"31-08-2026, 20:00\".",
+      "timestamp": "2026-08-20T07:33:51.594Z"
+    },
+    {
+      "id": 6,
+      "type": "HAPUS_RESERVASI",
+      "reservationId": "RSV-4821",
+      "userId": 111222333,
+      "actor": "sofunsyabi",
+      "description": "Reservasi RSV-4821 milik Budi Santoso dihapus permanen oleh Owner.",
+      "timestamp": "2026-08-20T07:35:01.200Z"
+    },
+    {
+      "id": 7,
+      "type": "RESERVASI_BARU",
+      "reservationId": "RSV-6197",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Reservasi baru RSV-6197 dibuat oleh ARASYA RAFI untuk 31-08-2026, 11:00.",
+      "timestamp": "2026-08-20T08:02:04.922Z"
+    },
+    {
+      "id": 8,
+      "type": "PENETAPAN_MEJA",
+      "reservationId": "RSV-6197",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Admin menentukan meja Meja 5 (Outdoor Garden) untuk reservasi RSV-6197.",
+      "timestamp": "2026-08-20T08:04:27.944Z"
+    },
+    {
+      "id": 9,
+      "type": "UBAH_STATUS",
+      "reservationId": "RSV-6197",
+      "userId": 1669925773,
+      "actor": "sofunsyabi",
+      "description": "Status reservasi RSV-6197 diubah dari \"Pending\" menjadi \"Dikonfirmasi\".",
+      "timestamp": "2026-08-20T08:23:37.188Z"
+    },
+    {
+      "id": 10,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Menu makanan/minuman baru \"Golda Coffee\" ditambahkan.",
+      "timestamp": "2026-08-20T08:29:37.047Z"
+    },
+    {
+      "id": 11,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Nama bot diubah menjadi \"ACAKAFE RESERVASI\".",
+      "timestamp": "2026-08-20T08:58:49.682Z"
+    },
+    {
+      "id": 12,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Alamat toko diubah menjadi \"Jalan Kenangan Bersama Mantan Tersayang\".",
+      "timestamp": "2026-08-20T08:59:18.289Z"
+    },
+    {
+      "id": 13,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Nama toko diubah menjadi \"ACAKAFE\".",
+      "timestamp": "2026-08-20T08:59:33.241Z"
+    },
+    {
+      "id": 14,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Logo toko diubah.",
+      "timestamp": "2026-08-20T09:00:20.865Z"
+    },
+    {
+      "id": 15,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Logo toko diubah.",
+      "timestamp": "2026-08-20T09:01:34.286Z"
+    },
+    {
+      "id": 16,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Logo toko diubah.",
+      "timestamp": "2026-08-20T09:01:49.969Z"
+    }
+  ],
+  "reviews": [
+    {
+      "id": 1,
+      "reservationId": "RSV-5358",
+      "userId": 1669925773,
+      "rating": 5,
+      "feedback": "Pelayanan sangat baik dan meja tepat sesuai permintaan!",
+      "createdAt": "2026-08-20T14:00:00.000Z"
+    }
+  ],
+  "blockedDates": [],
+  "menu": [
+    {
+      "id": "M-01",
+      "name": "Nasi Goreng Spesial Le Gourmand",
+      "category": "Makanan",
+      "price": 45000,
+      "description": "Nasi goreng khas restoran dengan telur mata sapi, sate ayam, dan kerupuk.",
+      "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500"
+    },
+    {
+      "id": "M-02",
+      "name": "Beef Steak Ribeye",
+      "category": "Makanan",
+      "price": 120000,
+      "description": "Daging sapi pilihan 200g dengan saus lada hitam dan kentang goreng.",
+      "image": "https://images.unsplash.com/photo-1558030006-450675393462?w=500"
+    },
+    {
+      "id": "D-01",
+      "name": "Es Teh Manis Jumbo",
+      "category": "Minuman",
+      "price": 10000,
+      "description": "Teh melati segar dengan gula asli dan es batu.",
+      "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500"
+    },
+    {
+      "id": "D-02",
+      "name": "Iced Avocado Coffee",
+      "category": "Minuman",
+      "price": 35000,
+      "description": "Perpaduan jus alpukat kental, espresso shot, dan es krim cokelat.",
+      "image": "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500"
+    },
+    {
+      "id": "MENU-mt19exee",
+      "name": "Golda Coffee",
+      "category": "Minuman",
+      "price": 2500,
+      "description": "Golda Coffee",
+      "image": "https://api.telegram.org/file/bot8438650784:AAFhP2frfQU3NRlLL4zr4oj53mhNw2Hn3u8/photos/file_0.jpg",
+      "createdAt": "2026-08-20T08:29:37.046Z"
+    }
+  ]
+}

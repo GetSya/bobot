@@ -1,0 +1,14 @@
+{
+  "name": "bot-reservasi-telegram",
+  "version": "3.0.0",
+  "description": "Bot Telegram Sistem Reservasi Meja Restoran / Tiket dengan database db.json",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
