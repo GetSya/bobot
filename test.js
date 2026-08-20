@@ -117,6 +117,40 @@ assert.strictEqual(deletedTable, true);
 assert.strictEqual(db.getTableById('T-07'), null);
 assert.strictEqual(db.getTables().length, 6);
 
+// User Roles Unit Tests
+const { isOwner, getUserRole, isAdmin, isKasir, hasStaffAccess } = require('./handlers');
+
+db.upsertUser({ id: 999991, username: 'sofunsyabi', first_name: 'Owner Syabi' });
+db.upsertUser({ id: 888881, username: 'admin1', first_name: 'Admin One' });
+db.upsertUser({ id: 777771, username: 'kasir1', first_name: 'Kasir Resto' });
+db.upsertUser({ id: 666661, username: 'customer1', first_name: 'Pelanggan Regular' });
+
+db.setUserRole('admin1', 'admin');
+db.setUserRole('kasir1', 'kasir');
+
+assert.strictEqual(getUserRole(db, { from: { id: 999991, username: 'sofunsyabi' } }), 'owner');
+assert.strictEqual(getUserRole(db, { from: { id: 888881, username: 'admin1' } }), 'admin');
+assert.strictEqual(getUserRole(db, { from: { id: 777771, username: 'kasir1' } }), 'kasir');
+assert.strictEqual(getUserRole(db, { from: { id: 666661, username: 'customer1' } }), 'user');
+
+assert.strictEqual(isOwner({ from: { username: 'sofunsyabi' } }), true);
+assert.strictEqual(isOwner({ from: { username: 'admin1' } }), false);
+
+assert.strictEqual(isAdmin(db, { from: { id: 999991, username: 'sofunsyabi' } }), true);
+assert.strictEqual(isAdmin(db, { from: { id: 888881, username: 'admin1' } }), true);
+assert.strictEqual(isAdmin(db, { from: { id: 777771, username: 'kasir1' } }), false);
+
+assert.strictEqual(isKasir(db, { from: { id: 777771, username: 'kasir1' } }), true);
+assert.strictEqual(isKasir(db, { from: { id: 888881, username: 'admin1' } }), false);
+
+assert.strictEqual(hasStaffAccess(db, { from: { id: 999991, username: 'sofunsyabi' } }), true);
+assert.strictEqual(hasStaffAccess(db, { from: { id: 888881, username: 'admin1' } }), true);
+assert.strictEqual(hasStaffAccess(db, { from: { id: 777771, username: 'kasir1' } }), true);
+assert.strictEqual(hasStaffAccess(db, { from: { id: 666661, username: 'customer1' } }), false);
+
+assert.strictEqual(db.getUsersByRole('admin').length, 1);
+assert.strictEqual(db.getUsersByRole('kasir').length, 1);
+
 if (fs.existsSync(TEST_DB)) {
   fs.unlinkSync(TEST_DB);
 }

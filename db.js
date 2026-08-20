@@ -8,6 +8,7 @@ class User {
     this.id = Number(data.id);
     this.username = data.username || null;
     this.firstName = data.firstName || '';
+    this.role = data.role || 'user';
     this.firstSeen = data.firstSeen || new Date().toISOString();
     this.lastSeen = data.lastSeen || new Date().toISOString();
     this.totalReservations = data.totalReservations || 0;
@@ -245,11 +246,15 @@ class DatabaseManager {
     if (!from) return;
     const key = String(from.id);
     const now = new Date().toISOString();
+    const ownerName = (process.env.OWNER_USERNAME || 'sofunsyabi').toLowerCase();
+    const isOwnerUser = Boolean(from.username && from.username.toLowerCase() === ownerName);
+
     if (!this.data.users[key]) {
       this.data.users[key] = new User({
         id: from.id,
         username: from.username || null,
         firstName: from.first_name || '',
+        role: isOwnerUser ? 'owner' : 'user',
         firstSeen: now,
         lastSeen: now,
         totalReservations: 0
@@ -258,17 +263,94 @@ class DatabaseManager {
       this.data.users[key].username = from.username || this.data.users[key].username;
       this.data.users[key].firstName = from.first_name || this.data.users[key].firstName;
       this.data.users[key].lastSeen = now;
+      if (isOwnerUser) {
+        this.data.users[key].role = 'owner';
+      } else if (!this.data.users[key].role) {
+        this.data.users[key].role = 'user';
+      }
     }
     this.saveDB();
-    return this.data.users[key];
+    return new User(this.data.users[key]);
   }
 
   getUser(userId) {
-    return this.data.users[String(userId)] || null;
+    const raw = this.data.users[String(userId)];
+    return raw ? new User(raw) : null;
+  }
+
+  getUserByUsernameOrId(query) {
+    if (!query) return null;
+    const cleanQuery = String(query).replace(/^@/, '').toLowerCase().trim();
+    const users = Object.values(this.data.users);
+
+    if (/^\d+$/.test(cleanQuery)) {
+      const foundById = this.data.users[cleanQuery];
+      if (foundById) return new User(foundById);
+    }
+
+    const foundByUsername = users.find((u) => u.username && u.username.toLowerCase() === cleanQuery);
+    if (foundByUsername) return new User(foundByUsername);
+
+    return null;
   }
 
   getAllUsers() {
-    return Object.values(this.data.users);
+    return Object.values(this.data.users).map((u) => new User(u));
+  }
+
+  setUserRole(userIdOrUsername, role) {
+    if (!userIdOrUsername) return null;
+    const clean = String(userIdOrUsername).replace(/^@/, '').toLowerCase().trim();
+    let targetKey = null;
+
+    if (this.data.users[clean]) {
+      targetKey = clean;
+    } else {
+      const entry = Object.entries(this.data.users).find(([_, u]) => u.username && u.username.toLowerCase() === clean);
+      if (entry) targetKey = entry[0];
+    }
+
+    if (!targetKey) {
+      if (/^\d+$/.test(clean)) {
+        targetKey = clean;
+        this.data.users[targetKey] = new User({
+          id: Number(clean),
+          role: role
+        });
+      } else {
+        return null;
+      }
+    }
+
+    this.data.users[targetKey].role = role;
+    this.saveDB();
+    return new User(this.data.users[targetKey]);
+  }
+
+  getUserRole(userIdOrUsername) {
+    const ownerName = (process.env.OWNER_USERNAME || 'sofunsyabi').toLowerCase();
+    const clean = String(userIdOrUsername).replace(/^@/, '').toLowerCase().trim();
+    if (clean === ownerName) return 'owner';
+
+    const user = this.getUserByUsernameOrId(userIdOrUsername);
+    if (user) {
+      if (user.username && user.username.toLowerCase() === ownerName) return 'owner';
+      return user.role || 'user';
+    }
+    return 'user';
+  }
+
+  getUsersByRole(role) {
+    const ownerName = (process.env.OWNER_USERNAME || 'sofunsyabi').toLowerCase();
+    const targetRole = (role || '').toLowerCase();
+    const allUsers = Object.values(this.data.users);
+
+    return allUsers
+      .map((u) => new User(u))
+      .filter((u) => {
+        const uRole = (u.username && u.username.toLowerCase() === ownerName) ? 'owner' : (u.role || 'user');
+        return uRole.toLowerCase() === targetRole;
+      });
   }
 
   logActivity({ type, reservationId = null, userId = null, actor = null, description }) {

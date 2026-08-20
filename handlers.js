@@ -47,7 +47,10 @@ const {
   adminTableManagementKeyboard,
   adminTablesListKeyboard,
   adminTableEditOptionsKeyboard,
-  adminTableAreaPickKeyboard
+  adminTableAreaPickKeyboard,
+  kasirMenuInline,
+  adminRolesKeyboard,
+  roleSelectionKeyboard
 } = require('./keyboards');
 
 const sessions = {};
@@ -105,31 +108,71 @@ function getOwnerUsername() {
 function isOwner(fromOrMsg) {
   const from = (fromOrMsg && fromOrMsg.from) ? fromOrMsg.from : fromOrMsg;
   const ownerName = getOwnerUsername().toLowerCase();
-  return !!(from && from.username && from.username.toLowerCase() === ownerName);
+  return Boolean(from && from.username && from.username.toLowerCase() === ownerName);
+}
+
+function getUserRole(db, fromOrMsg) {
+  if (isOwner(fromOrMsg)) return 'owner';
+  const from = (fromOrMsg && fromOrMsg.from) ? fromOrMsg.from : fromOrMsg;
+  if (!from) return 'user';
+
+  if (from.username) {
+    const roleByUsername = db.getUserRole(from.username);
+    if (roleByUsername !== 'user') return roleByUsername;
+  }
+  if (from.id) {
+    const roleById = db.getUserRole(from.id);
+    if (roleById !== 'user') return roleById;
+  }
+  return 'user';
+}
+
+function isAdmin(db, fromOrMsg) {
+  const role = getUserRole(db, fromOrMsg);
+  return role === 'owner' || role === 'admin';
+}
+
+function isKasir(db, fromOrMsg) {
+  const role = getUserRole(db, fromOrMsg);
+  return role === 'kasir';
+}
+
+function hasStaffAccess(db, fromOrMsg) {
+  const role = getUserRole(db, fromOrMsg);
+  return role === 'owner' || role === 'admin' || role === 'kasir';
 }
 
 function resetSession(chatId) {
   delete sessions[chatId];
 }
 
-async function sendMainMenu(bot, db, chatId, fromIsOwner, greet = false, fromName = '') {
+async function sendMainMenu(bot, db, chatId, userRoleOrOwner, greet = false, fromName = '') {
   const settings = db.getSettings();
+  let userRole = 'user';
+  if (typeof userRoleOrOwner === 'string') {
+    userRole = userRoleOrOwner;
+  } else if (typeof userRoleOrOwner === 'boolean') {
+    userRole = userRoleOrOwner ? 'owner' : 'user';
+  } else if (userRoleOrOwner) {
+    userRole = getUserRole(db, userRoleOrOwner);
+  }
+
   const textHeader = greet
-    ? `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\nHalo ${fromName || 'Kak'}!\n\nSelamat datang di *${settings.shopName || 'Restoran'}*\n_${settings.description || ''}_\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────୨ৎ────\n🡻 Silakan pilih menu di bawah ini:`
-    : `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*${settings.shopName || 'Menu Utama'}*\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────୨ৎ────\n🡻 Silakan pilih menu:`;
+    ? `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\nHalo ${fromName || 'Kak'}!\n\nSelamat datang di *${settings.shopName || 'Restoran'}*\n_${settings.description || ''}_\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────发电─────\n🡻 Silakan pilih menu di bawah ini:`
+    : `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*${settings.shopName || 'Menu Utama'}*\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────发电─────\n🡻 Silakan pilih menu:`;
 
   if (settings.logo && typeof settings.logo === 'string' && settings.logo.trim() !== '') {
     const sent = await safeSendPhoto(bot, chatId, settings.logo, {
       caption: textHeader,
       parse_mode: 'Markdown',
-      ...mainMenuInline(fromIsOwner, settings)
+      ...mainMenuInline(userRole, settings)
     });
     if (sent) return;
   }
 
   await safeSendMessage(bot, chatId, textHeader, {
     parse_mode: 'Markdown',
-    ...mainMenuInline(fromIsOwner, settings)
+    ...mainMenuInline(userRole, settings)
   });
 }
 
@@ -217,18 +260,23 @@ async function handleTextMessage(bot, db, msg) {
   }
 
   if (text.startsWith('/')) {
+    const userRole = getUserRole(db, msg);
     if (text === '/start') {
       resetSession(chatId);
       await safeSendMessage(bot, chatId, '🡻 Gunakan menu di bawah ini untuk navigasi cepat:', persistentKeyboard());
-      await sendMainMenu(bot, db, chatId, isOwner(msg), true, msg.from.first_name);
+      await sendMainMenu(bot, db, chatId, userRole, true, msg.from.first_name);
       return;
     }
     if (text === '/menu') {
       resetSession(chatId);
-      await sendMainMenu(bot, db, chatId, isOwner(msg));
+      await sendMainMenu(bot, db, chatId, userRole);
       return;
     }
     if (text.startsWith('/cari')) {
+      if (!hasStaffAccess(db, msg)) {
+        await safeSendMessage(bot, chatId, '[!] Fitur pencarian ini hanya untuk Kasir/Staf Restoran.');
+        return;
+      }
       const parts = text.split(' ');
       const phoneQuery = parts.slice(1).join(' ').trim();
       if (!phoneQuery) {
@@ -242,21 +290,88 @@ async function handleTextMessage(bot, db, msg) {
       }
       let replyText = `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Hasil Pencarian Reservasi HP: ${phoneQuery}* (${results.length} ditemukan):\n────୨ৎ────\n\n`;
       results.forEach((r, idx) => {
-        replyText += `${idx + 1}. ${formatReservation(r, { detailed: true, forAdmin: isOwner(msg) })}\n────୨ৎ────\n`;
+        replyText += `${idx + 1}. ${formatReservation(r, { detailed: true, forAdmin: true })}\n────୨ৎ────\n`;
       });
       await safeSendMessage(bot, chatId, replyText, { parse_mode: 'Markdown' });
       return;
     }
     if (text === '/admin') {
-      if (!isOwner(msg)) {
+      if (!isAdmin(db, msg)) {
+        if (isKasir(db, msg)) {
+          resetSession(chatId);
+          await safeSendMessage(bot, chatId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Kasir Restoran*\n🡻 Silakan pilih menu:', {
+            parse_mode: 'Markdown',
+            ...kasirMenuInline()
+          });
+          return;
+        }
         await safeSendMessage(bot, chatId, '[!] Maaf, Anda tidak memiliki akses ke panel ini.');
         return;
       }
-      ownerChatId = chatId;
+      if (isOwner(msg)) ownerChatId = chatId;
       resetSession(chatId);
-      await safeSendMessage(bot, chatId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Owner / Admin*\n🡻 Silakan pilih menu:', {
+      await safeSendMessage(bot, chatId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Admin Restoran*\n🡻 Silakan pilih menu:', {
         parse_mode: 'Markdown',
-        ...adminMenuInline()
+        ...adminMenuInline(userRole)
+      });
+      return;
+    }
+    if (text === '/kasir') {
+      if (!hasStaffAccess(db, msg)) {
+        await safeSendMessage(bot, chatId, '[!] Maaf, fitur ini hanya untuk Kasir atau Staf Restoran.');
+        return;
+      }
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Kasir Restoran*\n🡻 Silakan pilih menu:', {
+        parse_mode: 'Markdown',
+        ...kasirMenuInline()
+      });
+      return;
+    }
+    if (text === '/role') {
+      if (!isOwner(msg)) {
+        await safeSendMessage(bot, chatId, '[!] Maaf, hanya Owner (@sofunsyabi) yang dapat mengelola role user.');
+        return;
+      }
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, '👥 *Panel Kelola Role User (Owner Only)*\n────୨ৎ────\n\n🡻 Silakan pilih menu di bawah:', {
+        parse_mode: 'Markdown',
+        ...adminRolesKeyboard(db)
+      });
+      return;
+    }
+    if (text.startsWith('/setrole')) {
+      if (!isOwner(msg)) {
+        await safeSendMessage(bot, chatId, '[!] Maaf, hanya Owner (@sofunsyabi) yang dapat menguji/mengubah role user.');
+        return;
+      }
+      const parts = text.split(' ').filter(Boolean);
+      if (parts.length < 3) {
+        await safeSendMessage(bot, chatId, '👥 *Format Penggunaan Command /setrole*\n╰┈➤ Syntax: `/setrole [@username_atau_ID] [admin|kasir|user]`\n╰┈➤ Contoh: `/setrole @budi admin`\n╰┈➤ Contoh: `/setrole 12345678 kasir`', { parse_mode: 'Markdown' });
+        return;
+      }
+      const targetUserKey = parts[1];
+      const targetRole = parts[2].toLowerCase();
+
+      if (!['admin', 'kasir', 'user'].includes(targetRole)) {
+        await safeSendMessage(bot, chatId, '[!] Role tidak valid! Pilih: `admin`, `kasir`, atau `user`.', { parse_mode: 'Markdown' });
+        return;
+      }
+
+      const updatedUser = db.setUserRole(targetUserKey, targetRole);
+      if (!updatedUser) {
+        await safeSendMessage(bot, chatId, `[!] User *${targetUserKey}* belum pernah berinteraksi dengan bot. Kirimkan User ID angka untuk mendaftarkan stub user.`, { parse_mode: 'Markdown' });
+        return;
+      }
+      db.logActivity({
+        type: 'SETTING_UPDATE',
+        actor: msg.from.username,
+        description: `Owner mengubah role user ${targetUserKey} menjadi "${targetRole.toUpperCase()}".`
+      });
+      await safeSendMessage(bot, chatId, `°˖➴ Role user *${targetUserKey}* berhasil diubah menjadi *${targetRole.toUpperCase()}*!`, persistentKeyboard());
+      await safeSendMessage(bot, chatId, '👥 *Panel Kelola Role User (Owner Only)*:', {
+        parse_mode: 'Markdown',
+        ...adminRolesKeyboard(db)
       });
       return;
     }
@@ -265,7 +380,7 @@ async function handleTextMessage(bot, db, msg) {
 
   if (text === '▶︎ Main Menu' || text === '[ Main Menu ]' || text === '🏠 Menu Utama') {
     resetSession(chatId);
-    await sendMainMenu(bot, db, chatId, isOwner(msg));
+    await sendMainMenu(bot, db, chatId, getUserRole(db, msg));
     return;
   }
 
@@ -581,6 +696,19 @@ async function handleConversationStep(bot, db, msg, session) {
       await safeSendMessage(bot, chatId, formatTable(updatedTName), {
         parse_mode: 'Markdown',
         ...adminTableEditOptionsKeyboard(updatedTName.id)
+      });
+      break;
+
+    case 'ADMIN_INPUT_ROLE_USER':
+      if (!text || text.length < 2) {
+        await safeSendMessage(bot, chatId, '[!] Input tidak valid. Masukkan @username Telegram atau User ID angka:');
+        return;
+      }
+      const targetKeyInput = text.trim();
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, `👥 *Pilih Role untuk User ${targetKeyInput}*\n────୨ৎ────\n\n🡻 Silakan tentukan hak akses/role yang ingin diberikan:`, {
+        parse_mode: 'Markdown',
+        ...roleSelectionKeyboard(targetKeyInput)
       });
       break;
 
@@ -1392,17 +1520,134 @@ async function handleCallbackQuery(bot, db, query) {
     return;
   }
 
-  if (isOwner(query)) {
+  if (hasStaffAccess(db, query)) {
     await handleAdminCallbacks(bot, db, query, data, chatId, messageId);
   }
 }
 
 async function handleAdminCallbacks(bot, db, query, data, chatId, messageId) {
-  if (data === 'admin_menu') {
+  if (data === 'kasir_menu') {
+    if (!hasStaffAccess(db, query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Fitur ini khusus Staf/Kasir.', show_alert: true });
+    }
     await bot.answerCallbackQuery(query.id);
-    await safeEditMessage(bot, chatId, messageId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Owner / Admin*\n🡻 Silakan pilih menu:', {
+    await safeEditMessage(bot, chatId, messageId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Kasir Restoran*\n🡻 Silakan pilih menu:', {
       parse_mode: 'Markdown',
-      ...adminMenuInline()
+      ...kasirMenuInline()
+    });
+    return;
+  }
+
+  if (data === 'kasir_tables_view') {
+    if (!hasStaffAccess(db, query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak!', show_alert: true });
+    }
+    await bot.answerCallbackQuery(query.id);
+    const tablesList = db.getTables();
+    let text = `🪑 *Status Meja Restoran saat ini* (Total: ${tablesList.length} meja):\n────୨ৎ────\n\n`;
+    text += tablesList.map((t) => `╰┈➤ *${t.name}* (${t.id})\n   Area: ${t.area} | Kapasitas: ${t.capacity} orang`).join('\n\n');
+    await safeEditMessage(bot, chatId, messageId, text, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [[{ text: '🢁 Kembali ke Panel Kasir', callback_data: 'kasir_menu' }]] }
+    });
+    return;
+  }
+
+  if (data === 'admin_roles') {
+    if (!isOwner(query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Hanya Owner (@sofunsyabi) yang dapat mengelola role user.', show_alert: true });
+    }
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, '👥 *Panel Kelola Role User (Owner Only)*\n────୨ৎ────\n\n🡻 Silakan pilih user untuk diubah rolenya atau tambah role baru:', {
+      parse_mode: 'Markdown',
+      ...adminRolesKeyboard(db)
+    });
+    return;
+  }
+
+  if (data === 'admin_role_add') {
+    if (!isOwner(query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Hanya Owner (@sofunsyabi) yang dapat mengelola role user.', show_alert: true });
+    }
+    sessions[chatId] = { step: 'ADMIN_INPUT_ROLE_USER' };
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, '👥 *Tambah / Ubah Role User Baru*\n\n╰┈➤ Masukkan *@username Telegram* (contoh: `@budi`) atau *Telegram User ID* (contoh: `12345678`):', {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [cancelProcessRow()] }
+    });
+    return;
+  }
+
+  if (data.startsWith('admin_role_pick_')) {
+    if (!isOwner(query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Hanya Owner (@sofunsyabi) yang dapat mengelola role user.', show_alert: true });
+    }
+    const userIdStr = data.replace('admin_role_pick_', '');
+    const userObj = db.getUser(userIdStr);
+    const userLabel = userObj ? (userObj.username ? '@' + userObj.username : userObj.firstName || userObj.id) : userIdStr;
+    const currentRole = userObj ? (userObj.role || 'user') : 'user';
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `👥 *Kelola Role untuk User:* ${userLabel}\n╰┈➤ Role saat ini: *${currentRole.toUpperCase()}*\n────୨ৎ────\n\n🡻 Pilih role baru:`, {
+      parse_mode: 'Markdown',
+      ...roleSelectionKeyboard(userIdStr)
+    });
+    return;
+  }
+
+  if (data.startsWith('role_set_')) {
+    if (!isOwner(query)) {
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Hanya Owner (@sofunsyabi) yang dapat mengelola role user.', show_alert: true });
+    }
+    const parts = data.split('_');
+    const role = parts.pop();
+    const userKey = parts.slice(2).join('_');
+    const updated = db.setUserRole(userKey, role);
+    db.logActivity({
+      type: 'SETTING_UPDATE',
+      actor: query.from.username,
+      description: `Owner mengubah role user ${userKey} menjadi "${role.toUpperCase()}".`
+    });
+    await bot.answerCallbackQuery(query.id, { text: `Role ${role.toUpperCase()} diterapkan!` });
+    await safeEditMessage(bot, chatId, messageId, `°˖➴ Role user *${userKey}* berhasil diubah menjadi *${role.toUpperCase()}*!`, {
+      parse_mode: 'Markdown',
+      ...adminRolesKeyboard(db)
+    });
+    return;
+  }
+
+  const adminOnlyActions = [
+    'admin_settings', 'set_', 'admin_broadcast', 'admin_csv', 'admin_backuprestore',
+    'admin_backup_download', 'admin_restore_upload', 'admin_tables_manage', 'admin_tables_list',
+    'admin_addtable_start', 'addtable_area_', 'admin_table_pick_', 'edittable_name_',
+    'edittable_area_', 'settablearea_', 'edittable_cap_', 'edittable_del_', 'admin_menu_manage',
+    'admin_menu_list', 'admin_addmenu_start', 'addmenucat_', 'admin_menu_pick_', 'editmenu_name_',
+    'editmenu_cat_', 'setmenucat_', 'editmenu_price_', 'editmenu_desc_', 'editmenu_img_',
+    'editmenu_del_', 'admin_blockouts', 'addblock_start', 'delblock_', 'admin_logs',
+    'admin_users', 'admin_delete', 'admin_delconfirm_'
+  ];
+
+  const isAdminOnlyAction = adminOnlyActions.some((act) => data === act || data.startsWith(act));
+  if (isAdminOnlyAction && !isAdmin(db, query)) {
+    return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Kasir tidak memiliki akses ke fitur ini.', show_alert: true });
+  }
+
+  if (data === 'admin_menu') {
+    if (!isAdmin(db, query)) {
+      if (isKasir(db, query)) {
+        await bot.answerCallbackQuery(query.id);
+        await safeEditMessage(bot, chatId, messageId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Kasir Restoran*\n🡻 Silakan pilih menu:', {
+          parse_mode: 'Markdown',
+          ...kasirMenuInline()
+        });
+        return;
+      }
+      return await bot.answerCallbackQuery(query.id, { text: 'Akses ditolak! Fitur ini khusus Admin/Owner.', show_alert: true });
+    }
+    await bot.answerCallbackQuery(query.id);
+    const userRole = getUserRole(db, query);
+    await safeEditMessage(bot, chatId, messageId, '✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*Panel Admin Restoran*\n🡻 Silakan pilih menu:', {
+      parse_mode: 'Markdown',
+      ...adminMenuInline(userRole)
     });
     return;
   }
@@ -2212,5 +2457,10 @@ module.exports = {
   handleTextMessage,
   handleCallbackQuery,
   sendMainMenu,
-  getOwnerChatId
+  getOwnerChatId,
+  isOwner,
+  getUserRole,
+  isAdmin,
+  isKasir,
+  hasStaffAccess
 };

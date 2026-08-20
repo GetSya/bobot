@@ -10,7 +10,7 @@ function persistentKeyboard() {
   return { reply_markup: { keyboard: [['▶︎ Main Menu']], resize_keyboard: true } };
 }
 
-function mainMenuInline(fromIsOwner, settings = null) {
+function mainMenuInline(userRoleOrOwner, settings = null) {
   const rows = [
     [{ text: '▶︎ Buat Reservasi Baru', callback_data: 'menu_new' }],
     [{ text: '🛒𖦹˖°. Pre-Order Makanan/Minuman', callback_data: 'user_menu_browse' }],
@@ -29,8 +29,12 @@ function mainMenuInline(fromIsOwner, settings = null) {
     [{ text: '▶︎ Bantuan & Info Toko', callback_data: 'menu_help' }]
   ];
 
-  if (fromIsOwner) {
+  const role = typeof userRoleOrOwner === 'string' ? userRoleOrOwner.toLowerCase() : (userRoleOrOwner ? 'owner' : 'user');
+
+  if (role === 'owner' || role === 'admin') {
     rows.push([{ text: '▶︎ Panel Admin', callback_data: 'admin_menu' }]);
+  } else if (role === 'kasir') {
+    rows.push([{ text: '▶︎ Panel Kasir', callback_data: 'kasir_menu' }]);
   }
 
   return { reply_markup: { inline_keyboard: rows } };
@@ -175,39 +179,105 @@ function confirmKeyboard() {
   };
 }
 
-function adminMenuInline() {
+function adminMenuInline(userRoleOrOwner = 'admin') {
+  const isOwnerUser = typeof userRoleOrOwner === 'string' ? userRoleOrOwner.toLowerCase() === 'owner' : Boolean(userRoleOrOwner);
+  const rows = [
+    [
+      { text: '🛒𖦹˖°. Kelola Menu Restoran', callback_data: 'admin_menu_manage' },
+      { text: '🪑 Kelola Meja Restoran', callback_data: 'admin_tables_manage' }
+    ],
+    [
+      { text: '▶︎ Ubah Status Reservasi', callback_data: 'admin_manage' },
+      { text: '▶︎ Tentukan Meja User', callback_data: 'admin_assigntable_list' }
+    ],
+    [
+      { text: '▶︎ Statistik Visual', callback_data: 'admin_stats' },
+      { text: '▶︎ Lihat Semua Reservasi', callback_data: 'admin_list' }
+    ],
+    [
+      { text: '▶︎ Hari Libur (Blockouts)', callback_data: 'admin_blockouts' },
+      { text: '▶︎ Broadcast Ke User', callback_data: 'admin_broadcast' }
+    ],
+    [
+      { text: '▶︎ Setting Toko & Bot', callback_data: 'admin_settings' },
+      { text: '▶︎ Backup / Restore DB', callback_data: 'admin_backuprestore' }
+    ],
+    [
+      { text: '▶︎ Ekspor CSV', callback_data: 'admin_csv' },
+      { text: '▶︎ Log Aktivitas', callback_data: 'admin_logs|0' }
+    ],
+    [
+      { text: '▶︎ Data Pengguna', callback_data: 'admin_users|0' },
+      { text: '▶︎ Hapus Reservasi', callback_data: 'admin_delete' }
+    ]
+  ];
+
+  if (isOwnerUser) {
+    rows.push([{ text: '👥 Kelola Role User (Admin & Kasir)', callback_data: 'admin_roles' }]);
+  }
+
+  rows.push([{ text: '🢁 Menu Utama', callback_data: 'menu_main' }]);
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+function kasirMenuInline() {
   return {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '🛒𖦹˖°. Kelola Menu Restoran', callback_data: 'admin_menu_manage' },
-          { text: '🪑 Kelola Meja Restoran', callback_data: 'admin_tables_manage' }
-        ],
-        [
           { text: '▶︎ Ubah Status Reservasi', callback_data: 'admin_manage' },
-          { text: '▶︎ Tentukan Meja User', callback_data: 'admin_assigntable_list' }
+          { text: '🪑 Tentukan Meja User', callback_data: 'admin_assigntable_list' }
         ],
         [
-          { text: '▶︎ Statistik Visual', callback_data: 'admin_stats' },
-          { text: '▶︎ Lihat Semua Reservasi', callback_data: 'admin_list' }
+          { text: '📋 Lihat Semua Reservasi', callback_data: 'admin_list' },
+          { text: '📊 Statistik Visual', callback_data: 'admin_stats' }
         ],
         [
-          { text: '▶︎ Hari Libur (Blockouts)', callback_data: 'admin_blockouts' },
-          { text: '▶︎ Broadcast Ke User', callback_data: 'admin_broadcast' }
-        ],
-        [
-          { text: '▶︎ Setting Toko & Bot', callback_data: 'admin_settings' },
-          { text: '▶︎ Backup / Restore DB', callback_data: 'admin_backuprestore' }
-        ],
-        [
-          { text: '▶︎ Ekspor CSV', callback_data: 'admin_csv' },
-          { text: '▶︎ Log Aktivitas', callback_data: 'admin_logs|0' }
-        ],
-        [
-          { text: '▶︎ Data Pengguna', callback_data: 'admin_users|0' },
-          { text: '▶︎ Hapus Reservasi', callback_data: 'admin_delete' }
+          { text: '🪑 Lihat Status Meja Restoran', callback_data: 'kasir_tables_view' }
         ],
         [{ text: '🢁 Menu Utama', callback_data: 'menu_main' }]
+      ]
+    }
+  };
+}
+
+function adminRolesKeyboard(db) {
+  const admins = db.getUsersByRole('admin');
+  const kasirs = db.getUsersByRole('kasir');
+  const rows = [];
+
+  rows.push([{ text: '➕ Tambah / Ubah Role User Baru', callback_data: 'admin_role_add' }]);
+
+  if (admins.length > 0) {
+    admins.forEach((u) => {
+      const label = `⭐ Admin: ${u.username ? '@' + u.username : u.firstName || u.id}`;
+      rows.push([{ text: label, callback_data: `admin_role_pick_${u.id}` }]);
+    });
+  }
+
+  if (kasirs.length > 0) {
+    kasirs.forEach((u) => {
+      const label = `💵 Kasir: ${u.username ? '@' + u.username : u.firstName || u.id}`;
+      rows.push([{ text: label, callback_data: `admin_role_pick_${u.id}` }]);
+    });
+  }
+
+  rows.push([{ text: '🢁 Panel Owner', callback_data: 'admin_menu' }]);
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+function roleSelectionKeyboard(userKey) {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '⭐ Set Role ADMIN', callback_data: `role_set_${userKey}_admin` },
+          { text: '💵 Set Role KASIR', callback_data: `role_set_${userKey}_kasir` }
+        ],
+        [
+          { text: '👤 Hapus Role (Set User Normal)', callback_data: `role_set_${userKey}_user` }
+        ],
+        [{ text: '🢁 Kelola Role User', callback_data: 'admin_roles' }]
       ]
     }
   };
@@ -477,6 +547,9 @@ module.exports = {
   adminTableManagementKeyboard,
   adminTablesListKeyboard,
   adminTableEditOptionsKeyboard,
-  adminTableAreaPickKeyboard
+  adminTableAreaPickKeyboard,
+  kasirMenuInline,
+  adminRolesKeyboard,
+  roleSelectionKeyboard
 };
 
