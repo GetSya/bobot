@@ -337,7 +337,28 @@ function formatTable(t) {
   );
 }
 
+async function safeSendPhoto(bot, chatId, photoPathOrUrl, options = {}) {
+  try {
+    if (!photoPathOrUrl) return false;
+    let photoSource = photoPathOrUrl;
+    if (typeof photoPathOrUrl === 'string' && !photoPathOrUrl.startsWith('http://') && !photoPathOrUrl.startsWith('https://')) {
+      const absPath = path.isAbsolute(photoPathOrUrl) ? photoPathOrUrl : path.join(__dirname, photoPathOrUrl);
+      if (fs.existsSync(absPath)) {
+        photoSource = absPath;
+      }
+    }
+    await bot.sendPhoto(chatId, photoSource, options);
+    return true;
+  } catch (err) {
+    console.error(`[SEND PHOTO ERROR] chatId=${chatId}:`, err.message);
+    return false;
+  }
+}
+
 module.exports = {
+  ensureMediaDirs,
+  downloadAndSaveImage,
+  safeSendPhoto,
   parseDate,
   parseDateTime,
   isPastDateTime,

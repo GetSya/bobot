@@ -11,7 +11,10 @@ const {
   generateActivitiesCSV,
   generateVisualStats,
   safeSendMessage,
-  safeEditMessage
+  safeEditMessage,
+  ensureMediaDirs,
+  downloadAndSaveImage,
+  safeSendPhoto
 } = require('./utils');
 
 const {
@@ -115,16 +118,13 @@ async function sendMainMenu(bot, db, chatId, fromIsOwner, greet = false, fromNam
     ? `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\nHalo ${fromName || 'Kak'}!\n\nSelamat datang di *${settings.shopName || 'Restoran'}*\n_${settings.description || ''}_\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────୨ৎ────\n🡻 Silakan pilih menu di bawah ini:`
     : `✦•┈๑⋅⋯ ⋯⋅๑┈•✦\n*${settings.shopName || 'Menu Utama'}*\n╰┈➤ Alamat: ${settings.shopAddress || ''}\n────୨ৎ────\n🡻 Silakan pilih menu:`;
 
-  if (settings.logo && typeof settings.logo === 'string' && settings.logo.startsWith('http')) {
-    try {
-      await bot.sendPhoto(chatId, settings.logo, {
-        caption: textHeader,
-        parse_mode: 'Markdown',
-        ...mainMenuInline(fromIsOwner, settings)
-      });
-      return;
-    } catch (err) {
-    }
+  if (settings.logo && typeof settings.logo === 'string' && settings.logo.trim() !== '') {
+    const sent = await safeSendPhoto(bot, chatId, settings.logo, {
+      caption: textHeader,
+      parse_mode: 'Markdown',
+      ...mainMenuInline(fromIsOwner, settings)
+    });
+    if (sent) return;
   }
 
   await safeSendMessage(bot, chatId, textHeader, {
@@ -143,30 +143,45 @@ async function handleTextMessage(bot, db, msg) {
 
   if (msg.photo && msg.photo.length > 0 && isOwner(msg)) {
     const session = sessions[chatId];
-    if (session && (session.step === 'ADD_MENU_IMAGE' || session.step.startsWith('EDIT_MENU_IMAGE_'))) {
+    if (session) {
       try {
         const fileId = msg.photo[msg.photo.length - 1].file_id;
         const imgUrl = await bot.getFileLink(fileId);
+        if (session.step === 'SET_LOGO') {
+          const localPath = await downloadAndSaveImage(imgUrl, 'media/settings/logo.jpg');
+          db.updateSettings({ logo: localPath });
+          db.logActivity({ type: 'SETTING_UPDATE', actor: msg.from.username, description: `Logo toko diubah dan disimpan ke ${localPath}.` });
+          resetSession(chatId);
+          await safeSendMessage(bot, chatId, '°˖ `Logo toko berhasil diperbarui dan disimpan ke folder media/`!', persistentKeyboard());
+          await sendMainMenu(bot, db, chatId, true);
+          return;
+        }
         if (session.step === 'ADD_MENU_IMAGE') {
-          session.data.image = imgUrl;
+          const tempId = session.data.id || `MENU-${Date.now().toString(36)}`;
+          const relPath = `media/menu/${tempId}.jpg`;
+          const localPath = await downloadAndSaveImage(imgUrl, relPath);
+          session.data.image = localPath;
           const newItem = db.addMenuItem(session.data);
           db.logActivity({
             type: 'SETTING_UPDATE',
             actor: msg.from.username,
-            description: `Menu makanan/minuman baru "${newItem.name}" ditambahkan.`
+            description: `Menu makanan/minuman baru "${newItem.name}" ditambahkan dan disimpan ke ${localPath}.`
           });
           resetSession(chatId);
-          await safeSendMessage(bot, chatId, `°˖➴ Menu *${newItem.name}* berhasil ditambahkan!`, persistentKeyboard());
+          await safeSendMessage(bot, chatId, `°˖➴ Menu *${newItem.name}* berhasil ditambahkan dan gambar disimpan ke folder \`media/\`!`, persistentKeyboard());
           await safeSendMessage(bot, chatId, formatMenuItem(newItem), {
             parse_mode: 'Markdown',
             ...adminMenuItemEditOptionsKeyboard(newItem.id)
           });
           return;
-        } else if (session.step.startsWith('EDIT_MENU_IMAGE_')) {
+        }
+        if (session.step.startsWith('EDIT_MENU_IMAGE_')) {
           const itemId = session.step.replace('EDIT_MENU_IMAGE_', '');
-          const updated = db.updateMenuItem(itemId, { image: imgUrl });
+          const relPath = `media/menu/${itemId}.jpg`;
+          const localPath = await downloadAndSaveImage(imgUrl, relPath);
+          const updated = db.updateMenuItem(itemId, { image: localPath });
           resetSession(chatId);
-          await safeSendMessage(bot, chatId, `°˖➴ Foto menu *${updated.name}* berhasil diperbarui!`, persistentKeyboard());
+          await safeSendMessage(bot, chatId, `°˖➴ Foto menu *${updated.name}* berhasil diperbarui dan disimpan ke folder \`media/\`!`, persistentKeyboard());
           await safeSendMessage(bot, chatId, formatMenuItem(updated), {
             parse_mode: 'Markdown',
             ...adminMenuItemEditOptionsKeyboard(updated.id)
@@ -428,7 +443,11 @@ async function handleConversationStep(bot, db, msg, session) {
       break;
 
     case 'ADD_MENU_IMAGE':
-      const imgUrl = text === '-' ? null : text;
+      let imgUrl = text === '-' ? null : text;
+      if (imgUrl && (imgUrl.startsWith('http://') || imgUrl.startsWith('https://'))) {
+        const tempId = session.data.id || `MENU-${Date.now().toString(36)}`;
+        imgUrl = await downloadAndSaveImage(imgUrl, `media/menu/${tempId}.jpg`);
+      }
       session.data.image = imgUrl;
       const newItem = db.addMenuItem(session.data);
       db.logActivity({
@@ -484,7 +503,10 @@ async function handleConversationStep(bot, db, msg, session) {
 
     case 'EDIT_MENU_IMAGE':
       const editImgId = session.itemId;
-      const newImg = text === '-' ? null : text;
+      let newImg = text === '-' ? null : text;
+      if (newImg && (newImg.startsWith('http://') || newImg.startsWith('https://'))) {
+        newImg = await downloadAndSaveImage(newImg, `media/menu/${editImgId}.jpg`);
+      }
       const updatedImg = db.updateMenuItem(editImgId, { image: newImg });
       resetSession(chatId);
       await safeSendMessage(bot, chatId, `°˖➴ Gambar menu *${updatedImg.name}* berhasil diperbarui!`, persistentKeyboard());
@@ -619,7 +641,11 @@ async function handleConversationStep(bot, db, msg, session) {
       break;
 
     case 'SET_LOGO':
-      db.updateSettings({ logo: text });
+      let logoUrl = text;
+      if (logoUrl && (logoUrl.startsWith('http://') || logoUrl.startsWith('https://'))) {
+        logoUrl = await downloadAndSaveImage(logoUrl, 'media/settings/logo.jpg');
+      }
+      db.updateSettings({ logo: logoUrl });
       db.logActivity({ type: 'SETTING_UPDATE', actor: msg.from.username, description: `Logo toko diubah.` });
       resetSession(chatId);
       await safeSendMessage(bot, chatId, '°˖➴ Logo toko berhasil diperbarui!', persistentKeyboard());
@@ -1731,16 +1757,13 @@ async function handleAdminCallbacks(bot, db, query, data, chatId, messageId) {
     const item = db.getMenuItemById(itemId);
     if (!item) return await bot.answerCallbackQuery(query.id, { text: 'Menu tidak ditemukan.' });
     await bot.answerCallbackQuery(query.id);
-    if (item.image && typeof item.image === 'string' && item.image.startsWith('http')) {
-      try {
-        await bot.sendPhoto(chatId, item.image, {
-          caption: `🛒𖦹˖°. *Kelola Menu Atribut:*\n────୨ৎ────\n\n${formatMenuItem(item)}`,
-          parse_mode: 'Markdown',
-          ...adminMenuItemEditOptionsKeyboard(item.id)
-        });
-        return;
-      } catch (err) {
-      }
+    if (item.image && typeof item.image === 'string' && item.image.trim() !== '') {
+      const sent = await safeSendPhoto(bot, chatId, item.image, {
+        caption: `🛒𖦹˖°. *Kelola Menu Atribut:*\n────୨ৎ────\n\n${formatMenuItem(item)}`,
+        parse_mode: 'Markdown',
+        ...adminMenuItemEditOptionsKeyboard(item.id)
+      });
+      if (sent) return;
     }
     await safeEditMessage(bot, chatId, messageId, `🛒𖦹˖°. *Kelola Menu Atribut:*\n────୨ৎ────\n\n${formatMenuItem(item)}`, {
       parse_mode: 'Markdown',

@@ -4,7 +4,7 @@
     "description": "Sistem Reservasi Meja Restoran & Cafe Modern",
     "shopName": "ACAKAFE",
     "shopAddress": "Jalan Kenangan Bersama Mantan Tersayang",
-    "logo": "https://files.catbox.moe/gzvy8t.jpg"
+    "logo": "media/settings/logo.jpg"
   },
   "areas": [
     {
@@ -75,8 +75,16 @@
       "username": "sofunsyabi",
       "firstName": "Rfi",
       "firstSeen": "2026-08-20T07:32:14.129Z",
-      "lastSeen": "2026-08-20T09:02:56.754Z",
+      "lastSeen": "2026-08-20T09:56:09.266Z",
       "totalReservations": 2
+    },
+    "5073327364": {
+      "id": 5073327364,
+      "username": "whatareyoudoinghere1212",
+      "firstName": ".",
+      "firstSeen": "2026-08-20T09:50:31.551Z",
+      "lastSeen": "2026-08-20T09:50:31.551Z",
+      "totalReservations": 0
     }
   },
   "reservations": [
@@ -270,6 +278,15 @@
       "actor": "sofunsyabi",
       "description": "Logo toko diubah.",
       "timestamp": "2026-08-20T09:01:49.969Z"
+    },
+    {
+      "id": 17,
+      "type": "SETTING_UPDATE",
+      "reservationId": null,
+      "userId": null,
+      "actor": "sofunsyabi",
+      "description": "Logo toko diubah dan disimpan ke media/settings/logo.jpg.",
+      "timestamp": "2026-08-20T09:54:26.256Z"
     }
   ],
   "reviews": [

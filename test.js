@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { DatabaseManager } = require('./db');
-const { isPastDateTime, checkCapacityConflict, generateReservationsCSV } = require('./utils');
+const { isPastDateTime, checkCapacityConflict, generateReservationsCSV, ensureMediaDirs, downloadAndSaveImage } = require('./utils');
 
 const TEST_DB = path.join(__dirname, 'test_db.json');
 
@@ -11,6 +11,12 @@ if (fs.existsSync(TEST_DB)) {
 }
 
 const db = new DatabaseManager(TEST_DB);
+
+// Media Storage Test
+ensureMediaDirs();
+assert.ok(fs.existsSync(path.join(__dirname, 'media')));
+assert.ok(fs.existsSync(path.join(__dirname, 'media', 'settings')));
+assert.ok(fs.existsSync(path.join(__dirname, 'media', 'menu')));
 
 const settings = db.getSettings();
 assert.strictEqual(typeof settings.shopName, 'string');
