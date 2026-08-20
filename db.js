@@ -199,6 +199,48 @@ class DatabaseManager {
     return this.data.tables.filter((t) => t.area === areaId);
   }
 
+  getTableById(id) {
+    if (!this.data.tables) return null;
+    return this.data.tables.find((t) => t.id === id) || null;
+  }
+
+  addTable(tableData) {
+    if (!this.data.tables) this.data.tables = [];
+    const id = tableData.id || `T-${String(this.data.tables.length + 1).padStart(2, '0')}`;
+    const newTable = {
+      id,
+      name: tableData.name || `Meja ${id}`,
+      area: tableData.area || 'Indoor',
+      capacity: Number(tableData.capacity || 4)
+    };
+    this.data.tables.push(newTable);
+    this.saveDB();
+    return newTable;
+  }
+
+  updateTable(id, patch) {
+    if (!this.data.tables) return null;
+    const index = this.data.tables.findIndex((t) => t.id === id);
+    if (index === -1) return null;
+    if (patch.capacity !== undefined) patch.capacity = Number(patch.capacity);
+    this.data.tables[index] = {
+      ...this.data.tables[index],
+      ...patch
+    };
+    this.saveDB();
+    return this.data.tables[index];
+  }
+
+  deleteTable(id) {
+    if (!this.data.tables) return false;
+    const index = this.data.tables.findIndex((t) => t.id === id);
+    if (index === -1) return false;
+    this.data.tables.splice(index, 1);
+    this.saveDB();
+    return true;
+  }
+
+
   upsertUser(from) {
     if (!from) return;
     const key = String(from.id);

@@ -87,6 +87,30 @@ const deleted = db.deleteMenuItem(newMenu.id);
 assert.strictEqual(deleted, true);
 assert.strictEqual(db.getMenuItemById(newMenu.id), null);
 
+// Table CRUD Tests
+const initialTables = db.getTables();
+assert.strictEqual(initialTables.length, 6);
+
+const t1 = db.getTableById('T-01');
+assert.strictEqual(t1.name, 'Meja 1 (Indoor)');
+
+const newTable = db.addTable({
+  id: 'T-07',
+  name: 'Meja 7 (Outdoor Terrace)',
+  area: 'Outdoor',
+  capacity: 4
+});
+assert.strictEqual(newTable.id, 'T-07');
+assert.strictEqual(db.getTables().length, 7);
+
+const updatedTable = db.updateTable('T-07', { capacity: 6 });
+assert.strictEqual(updatedTable.capacity, 6);
+
+const deletedTable = db.deleteTable('T-07');
+assert.strictEqual(deletedTable, true);
+assert.strictEqual(db.getTableById('T-07'), null);
+assert.strictEqual(db.getTables().length, 6);
+
 if (fs.existsSync(TEST_DB)) {
   fs.unlinkSync(TEST_DB);
 }

@@ -6,6 +6,7 @@ const {
   formatReservation,
   formatMenuItem,
   formatCartSummary,
+  formatTable,
   generateReservationsCSV,
   generateActivitiesCSV,
   generateVisualStats,
@@ -39,7 +40,11 @@ const {
   adminMenuManagementKeyboard,
   adminCategoryPickKeyboard,
   adminMenuListKeyboard,
-  adminMenuItemEditOptionsKeyboard
+  adminMenuItemEditOptionsKeyboard,
+  adminTableManagementKeyboard,
+  adminTablesListKeyboard,
+  adminTableEditOptionsKeyboard,
+  adminTableAreaPickKeyboard
 } = require('./keyboards');
 
 const sessions = {};
@@ -486,6 +491,95 @@ async function handleConversationStep(bot, db, msg, session) {
       await safeSendMessage(bot, chatId, formatMenuItem(updatedImg), {
         parse_mode: 'Markdown',
         ...adminMenuItemEditOptionsKeyboard(updatedImg.id)
+      });
+      break;
+
+    case 'ADD_TABLE_ID':
+      if (text.length < 1) {
+        await safeSendMessage(bot, chatId, '[!] ID Meja tidak boleh kosong. Masukkan kode/ID meja (contoh: T-06):');
+        return;
+      }
+      const existingT = db.getTableById(text.toUpperCase());
+      if (existingT) {
+        await safeSendMessage(bot, chatId, `[!] Meja dengan ID *${text.toUpperCase()}* sudah ada. Gunakan ID lain:`, { parse_mode: 'Markdown' });
+        return;
+      }
+      session.data.id = text.toUpperCase();
+      session.step = 'ADD_TABLE_NAME';
+      await safeSendMessage(bot, chatId, `ID Meja: *${session.data.id}*\n\n╰┈➤ Masukkan *nama / deskripsi meja* (contoh: Meja 6 (Indoor Garden)):`, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [cancelProcessRow()] }
+      });
+      break;
+
+    case 'ADD_TABLE_NAME':
+      if (text.length < 2) {
+        await safeSendMessage(bot, chatId, '[!] Nama meja terlalu pendek. Masukkan nama yang jelas:');
+        return;
+      }
+      session.data.name = text;
+      session.step = 'ADD_TABLE_AREA';
+      await safeSendMessage(bot, chatId, `Nama Meja: *${text}*\n\n🡻 Pilih *Area* untuk meja ini:`, {
+        parse_mode: 'Markdown',
+        ...adminTableAreaPickKeyboard('addtable_area')
+      });
+      break;
+
+    case 'ADD_TABLE_CAPACITY':
+      const cap = parseInt(text.replace(/[^0-9]/g, ''), 10);
+      if (isNaN(cap) || cap <= 0) {
+        await safeSendMessage(bot, chatId, '[!] Masukkan angka kapasitas yang valid (contoh: 4):');
+        return;
+      }
+      session.data.capacity = cap;
+      const newT = db.addTable(session.data);
+      db.logActivity({
+        type: 'SETTING_UPDATE',
+        actor: msg.from.username,
+        description: `Meja baru "${newT.name}" (${newT.id}) ditambahkan oleh Admin.`
+      });
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, `°˖➴ Meja *${newT.name}* (${newT.id}) berhasil ditambahkan!`, persistentKeyboard());
+      await safeSendMessage(bot, chatId, formatTable(newT), {
+        parse_mode: 'Markdown',
+        ...adminTableEditOptionsKeyboard(newT.id)
+      });
+      break;
+
+    case 'EDIT_TABLE_NAME':
+      const tNameId = session.tableId;
+      const updatedTName = db.updateTable(tNameId, { name: text });
+      db.logActivity({
+        type: 'SETTING_UPDATE',
+        actor: msg.from.username,
+        description: `Nama meja ${tNameId} diubah menjadi "${text}".`
+      });
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, `°˖➴ Nama meja *${tNameId}* diubah menjadi *${updatedTName.name}*!`, persistentKeyboard());
+      await safeSendMessage(bot, chatId, formatTable(updatedTName), {
+        parse_mode: 'Markdown',
+        ...adminTableEditOptionsKeyboard(updatedTName.id)
+      });
+      break;
+
+    case 'EDIT_TABLE_CAPACITY':
+      const tCapId = session.tableId;
+      const capVal = parseInt(text.replace(/[^0-9]/g, ''), 10);
+      if (isNaN(capVal) || capVal <= 0) {
+        await safeSendMessage(bot, chatId, '[!] Masukkan angka kapasitas valid (contoh: 6):');
+        return;
+      }
+      const updatedTCap = db.updateTable(tCapId, { capacity: capVal });
+      db.logActivity({
+        type: 'SETTING_UPDATE',
+        actor: msg.from.username,
+        description: `Kapasitas meja ${tCapId} diubah menjadi ${capVal} orang.`
+      });
+      resetSession(chatId);
+      await safeSendMessage(bot, chatId, `°˖➴ Kapasitas meja *${tCapId}* diubah menjadi *${updatedTCap.capacity} orang*!`, persistentKeyboard());
+      await safeSendMessage(bot, chatId, formatTable(updatedTCap), {
+        parse_mode: 'Markdown',
+        ...adminTableEditOptionsKeyboard(updatedTCap.id)
       });
       break;
 
@@ -1433,6 +1527,153 @@ async function handleAdminCallbacks(bot, db, query, data, chatId, messageId) {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: [cancelProcessRow()] }
     });
+    return;
+  }
+
+  if (data === 'admin_tables_manage') {
+    await bot.answerCallbackQuery(query.id);
+    const tables = db.getTables();
+    const areas = db.getAreas();
+    const areaBreakdown = areas.map((a) => {
+      const count = tables.filter((t) => t.area === a.id).length;
+      return `   ╰┈➤ *${a.name}*: ${count} meja`;
+    }).join('\n');
+
+    const summaryText =
+      `🪑 *Fitur Manajemen Meja Restoran*\n` +
+      `────发电─────\n\n` +
+      `╰┈➤ *Total Meja saat ini*: *${tables.length} meja*\n\n` +
+      `*Rincian Area:*\n${areaBreakdown}\n\n` +
+      `🡻 Silakan pilih menu di bawah ini:`;
+
+    await safeEditMessage(bot, chatId, messageId, summaryText, {
+      parse_mode: 'Markdown',
+      ...adminTableManagementKeyboard()
+    });
+    return;
+  }
+
+  if (data === 'admin_tables_list') {
+    await bot.answerCallbackQuery(query.id);
+    const tablesList = db.getTables();
+    if (tablesList.length === 0) {
+      await safeEditMessage(bot, chatId, messageId, 'Belum ada meja terdaftar dalam database.', {
+        reply_markup: { inline_keyboard: [[{ text: '➕ Tambah Meja Baru', callback_data: 'admin_addtable_start' }], backToMenuRow()] }
+      });
+      return;
+    }
+    await safeEditMessage(bot, chatId, messageId, `🪑 *Daftar Meja Restoran* (Total: ${tablesList.length}):\n╰┈➤ Klik meja untuk melihat detail, edit atribut, atau menghapus:`, {
+      parse_mode: 'Markdown',
+      ...adminTablesListKeyboard(tablesList)
+    });
+    return;
+  }
+
+  if (data === 'admin_addtable_start') {
+    sessions[chatId] = { step: 'ADD_TABLE_ID', data: {} };
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, '*Tambah Meja Baru (Langkah 1/4)*\n\n╰┈➤ Masukkan *ID / Kode Meja* (contoh: `T-06` atau `V-02`):', {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [cancelProcessRow()] }
+    });
+    return;
+  }
+
+  if (data.startsWith('addtable_area_')) {
+    const area = data.replace('addtable_area_', '');
+    const session = sessions[chatId];
+    if (!session) return await bot.answerCallbackQuery(query.id, { text: 'Sesi berakhir.' });
+    session.data.area = area;
+    session.step = 'ADD_TABLE_CAPACITY';
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `*Masukkan Kapasitas Meja (Langkah 4/4)*:\nMeja: *${session.data.name}* (${area})\n\n╰┈➤ Ketik jumlah maksimal orang yang muat di meja ini (contoh: 4):`, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [cancelProcessRow()] }
+    });
+    return;
+  }
+
+  if (data.startsWith('admin_table_pick_')) {
+    const tableId = data.replace('admin_table_pick_', '');
+    const table = db.getTableById(tableId);
+    if (!table) return await bot.answerCallbackQuery(query.id, { text: 'Meja tidak ditemukan.' });
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `${formatTable(table)}\n\n🡻 Pilih atribut yang ingin diubah:`, {
+      parse_mode: 'Markdown',
+      ...adminTableEditOptionsKeyboard(table.id)
+    });
+    return;
+  }
+
+  if (data.startsWith('edittable_name_')) {
+    const tableId = data.replace('edittable_name_', '');
+    const table = db.getTableById(tableId);
+    sessions[chatId] = { step: 'EDIT_TABLE_NAME', tableId };
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `╰┈➤ Masukkan *nama / deskripsi baru* untuk meja *${table.id}* (Nama saat ini: ${table.name}):`, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [cancelProcessRow()] }
+    });
+    return;
+  }
+
+  if (data.startsWith('edittable_area_')) {
+    const tableId = data.replace('edittable_area_', '');
+    const table = db.getTableById(tableId);
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `🡻 Pilih *Area Baru* untuk meja *${table.id}* (${table.name}):`, {
+      parse_mode: 'Markdown',
+      ...adminTableAreaPickKeyboard(`settablearea_${tableId}`)
+    });
+    return;
+  }
+
+  if (data.startsWith('settablearea_')) {
+    const parts = data.split('_');
+    const tableId = parts[1];
+    const newArea = parts[2];
+    const updated = db.updateTable(tableId, { area: newArea });
+    db.logActivity({
+      type: 'SETTING_UPDATE',
+      actor: query.from.username,
+      description: `Area meja ${tableId} diubah menjadi ${newArea}.`
+    });
+    await bot.answerCallbackQuery(query.id, { text: `Area diubah ke ${newArea}!` });
+    await safeEditMessage(bot, chatId, messageId, `°˖➴ Area meja *${tableId}* diubah menjadi *${newArea}*!\n\n${formatTable(updated)}`, {
+      parse_mode: 'Markdown',
+      ...adminTableEditOptionsKeyboard(updated.id)
+    });
+    return;
+  }
+
+  if (data.startsWith('edittable_cap_')) {
+    const tableId = data.replace('edittable_cap_', '');
+    const table = db.getTableById(tableId);
+    sessions[chatId] = { step: 'EDIT_TABLE_CAPACITY', tableId };
+    await bot.answerCallbackQuery(query.id);
+    await safeEditMessage(bot, chatId, messageId, `╰┈➤ Masukkan *kapasitas baru (orang)* untuk meja *${table.id}* (Kapasitas saat ini: ${table.capacity} orang):`, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [cancelProcessRow()] }
+    });
+    return;
+  }
+
+  if (data.startsWith('edittable_del_')) {
+    const tableId = data.replace('edittable_del_', '');
+    const table = db.getTableById(tableId);
+    if (table) {
+      db.deleteTable(tableId);
+      db.logActivity({
+        type: 'SETTING_UPDATE',
+        actor: query.from.username,
+        description: `Meja "${table.name}" (${tableId}) dihapus oleh Admin.`
+      });
+      await bot.answerCallbackQuery(query.id, { text: `Meja ${tableId} dihapus!` });
+      await safeEditMessage(bot, chatId, messageId, `°˖➴ Meja *${table.name}* (${tableId}) telah dihapus dari sistem.`, {
+        parse_mode: 'Markdown',
+        ...adminTableManagementKeyboard()
+      });
+    }
     return;
   }
 

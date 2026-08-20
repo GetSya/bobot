@@ -181,7 +181,11 @@ function adminMenuInline() {
       inline_keyboard: [
         [
           { text: '🛒𖦹˖°. Kelola Menu Restoran', callback_data: 'admin_menu_manage' },
-          { text: '▶︎ Ubah Status Reservasi', callback_data: 'admin_manage' }
+          { text: '🪑 Kelola Meja Restoran', callback_data: 'admin_tables_manage' }
+        ],
+        [
+          { text: '▶︎ Ubah Status Reservasi', callback_data: 'admin_manage' },
+          { text: '▶︎ Tentukan Meja User', callback_data: 'admin_assigntable_list' }
         ],
         [
           { text: '▶︎ Statistik Visual', callback_data: 'admin_stats' },
@@ -192,18 +196,17 @@ function adminMenuInline() {
           { text: '▶︎ Broadcast Ke User', callback_data: 'admin_broadcast' }
         ],
         [
-          { text: '▶︎ Tentukan Meja User', callback_data: 'admin_assigntable_list' },
-          { text: '▶︎ Setting Toko & Bot', callback_data: 'admin_settings' }
+          { text: '▶︎ Setting Toko & Bot', callback_data: 'admin_settings' },
+          { text: '▶︎ Backup / Restore DB', callback_data: 'admin_backuprestore' }
         ],
         [
-          { text: '▶︎ Backup / Restore DB', callback_data: 'admin_backuprestore' },
-          { text: '▶︎ Ekspor CSV', callback_data: 'admin_csv' }
+          { text: '▶︎ Ekspor CSV', callback_data: 'admin_csv' },
+          { text: '▶︎ Log Aktivitas', callback_data: 'admin_logs|0' }
         ],
         [
-          { text: '▶︎ Log Aktivitas', callback_data: 'admin_logs|0' },
-          { text: '▶︎ Data Pengguna', callback_data: 'admin_users|0' }
+          { text: '▶︎ Data Pengguna', callback_data: 'admin_users|0' },
+          { text: '▶︎ Hapus Reservasi', callback_data: 'admin_delete' }
         ],
-        [{ text: '▶︎ Hapus Reservasi', callback_data: 'admin_delete' }],
         [{ text: '🢁 Menu Utama', callback_data: 'menu_main' }]
       ]
     }
@@ -387,6 +390,63 @@ function adminMenuItemEditOptionsKeyboard(itemId) {
   };
 }
 
+function adminTableManagementKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🪑 Lihat & Kelola Daftar Meja', callback_data: 'admin_tables_list' }],
+        [{ text: '➕ Tambah Meja Baru', callback_data: 'admin_addtable_start' }],
+        [{ text: '🢁 Panel Admin', callback_data: 'admin_menu' }]
+      ]
+    }
+  };
+}
+
+function adminTablesListKeyboard(tablesList = []) {
+  const rows = [];
+  tablesList.forEach((t) => {
+    rows.push([{ text: `🪑 ${t.id} - ${t.name} (${t.area}, Cap: ${t.capacity})`, callback_data: `admin_table_pick_${t.id}` }]);
+  });
+  rows.push([{ text: '➕ Tambah Meja Baru', callback_data: 'admin_addtable_start' }]);
+  rows.push([{ text: '🢁 Kelola Meja', callback_data: 'admin_tables_manage' }]);
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+function adminTableEditOptionsKeyboard(tableId) {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✏️ Edit Nama', callback_data: `edittable_name_${tableId}` },
+          { text: '🏷️ Edit Area', callback_data: `edittable_area_${tableId}` }
+        ],
+        [
+          { text: '👥 Edit Kapasitas', callback_data: `edittable_cap_${tableId}` }
+        ],
+        [
+          { text: '🗑️ Hapus Meja', callback_data: `edittable_del_${tableId}` }
+        ],
+        [{ text: '🢁 Daftar Meja', callback_data: 'admin_tables_list' }]
+      ]
+    }
+  };
+}
+
+function adminTableAreaPickKeyboard(actionPrefix = 'addtable_area') {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: 'Indoor', callback_data: `${actionPrefix}_Indoor` },
+          { text: 'Outdoor', callback_data: `${actionPrefix}_Outdoor` },
+          { text: 'VIP Room', callback_data: `${actionPrefix}_VIP` }
+        ],
+        cancelProcessRow()
+      ]
+    }
+  };
+}
+
 module.exports = {
   makeProgressBar,
   persistentKeyboard,
@@ -413,5 +473,10 @@ module.exports = {
   adminMenuManagementKeyboard,
   adminCategoryPickKeyboard,
   adminMenuListKeyboard,
-  adminMenuItemEditOptionsKeyboard
+  adminMenuItemEditOptionsKeyboard,
+  adminTableManagementKeyboard,
+  adminTablesListKeyboard,
+  adminTableEditOptionsKeyboard,
+  adminTableAreaPickKeyboard
 };
+

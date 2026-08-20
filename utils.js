@@ -1,3 +1,40 @@
+const fs = require('fs');
+const path = require('path');
+
+const MEDIA_DIR = path.join(__dirname, 'media');
+const MEDIA_SETTINGS_DIR = path.join(MEDIA_DIR, 'settings');
+const MEDIA_MENU_DIR = path.join(MEDIA_DIR, 'menu');
+
+function ensureMediaDirs() {
+  if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  if (!fs.existsSync(MEDIA_SETTINGS_DIR)) fs.mkdirSync(MEDIA_SETTINGS_DIR, { recursive: true });
+  if (!fs.existsSync(MEDIA_MENU_DIR)) fs.mkdirSync(MEDIA_MENU_DIR, { recursive: true });
+}
+
+async function downloadAndSaveImage(imageUrl, relativeDestPath) {
+  try {
+    ensureMediaDirs();
+    if (!imageUrl) return null;
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      const checkPath = path.isAbsolute(imageUrl) ? imageUrl : path.join(__dirname, imageUrl);
+      if (fs.existsSync(checkPath)) return imageUrl;
+    }
+    const fetch = (await import('node-fetch')).default || globalThis.fetch;
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const absolutePath = path.isAbsolute(relativeDestPath) ? relativeDestPath : path.join(__dirname, relativeDestPath);
+    const dir = path.dirname(absolutePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(absolutePath, buffer);
+    return relativeDestPath;
+  } catch (err) {
+    console.error('Gagal mendownload/menyimpan gambar:', err.message);
+    return imageUrl;
+  }
+}
+
 function parseDate(dateStr) {
   if (!dateStr) return new Date();
   if (dateStr.includes('-')) {
@@ -289,6 +326,17 @@ async function safeEditMessage(bot, chatId, messageId, text, options = {}) {
   }
 }
 
+function formatTable(t) {
+  return (
+    `🪑 *Detail Meja: ${t.name}*\n` +
+    `────୨ৎ────\n` +
+    `╰┈➤ ID Meja: *${t.id}*\n` +
+    `╰┈➤ Nama Meja: *${t.name}*\n` +
+    `╰┈➤ Area: *${t.area}*\n` +
+    `╰┈➤ Kapasitas: *${t.capacity} Orang*`
+  );
+}
+
 module.exports = {
   parseDate,
   parseDateTime,
@@ -303,6 +351,7 @@ module.exports = {
   formatReservation,
   formatMenuItem,
   formatCartSummary,
+  formatTable,
   generateReservationsCSV,
   generateActivitiesCSV,
   generateVisualStats,
